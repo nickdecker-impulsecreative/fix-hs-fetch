@@ -1,12 +1,12 @@
 #!/bin/bash
 
-# HubSpot Theme Fetcher Script
-# This script dynamically fetches all subfolders and files from any HubSpot theme
+# HubSpot Source Folder Fetcher Script
+# This script dynamically fetches all subfolders and files from any HubSpot source folder
 # to work around the CLI bug with the "." character in destination paths
 #
 # Usage: fetcher <src> <dest> [options]
 # Examples:
-#   fetcher Omega-2.0 Omega-2.0 -overwrite
+#   fetcher <source folder with . in it> <destination folder> -overwrite
 #   fetcher themeversion1.1 newfolder -o
 #   fetcher foldercity88.7 foldercity
 
@@ -44,7 +44,7 @@ show_usage() {
     echo "Usage: $0 <src> <dest> [options]"
     echo
     echo "Arguments:"
-    echo "  src    Source theme name in HubSpot"
+    echo "  src    Source folder name in HubSpot"
     echo "  dest   Local destination directory"
     echo
     echo "Options:"
@@ -52,10 +52,9 @@ show_usage() {
     echo "  -h, --help        Show this help message"
     echo
     echo "Examples:"
-    echo "  $0 Omega-2.0 Omega-2.0 -overwrite"
+    echo "  $0 <source folder with . in it> <destination folder> -overwrite"
     echo "  $0 themeversion1.1 newfolder -o"
     echo "  $0 foldercity88.7 foldercity"
-    echo "  $0 MyTheme ./my-local-theme -overwrite"
 }
 
 # Function to check if hs command is available
@@ -69,7 +68,7 @@ check_hs_command() {
 # Function to fetch a single item (folder or file)
 fetch_item() {
     local item="$1"
-    local remote_path="${THEME_NAME}/${item}"
+    local remote_path="${SOURCE_NAME}/${item}"
     local local_path="${LOCAL_DESTINATION}/${item}"
     
     print_status "Fetching: ${remote_path} -> ${local_path}"
@@ -83,14 +82,14 @@ fetch_item() {
     fi
 }
 
-# Function to fetch all items from the theme
+# Function to fetch all items from the source folder
 fetch_all_items() {
-    print_status "Getting list of items from ${THEME_NAME}..."
+    print_status "Getting list of items from ${SOURCE_NAME}..."
     
     # Get the list of items from hs ls
     local items
-    if ! items=$(hs ls "$THEME_NAME" 2>/dev/null); then
-        print_error "Failed to list items from ${THEME_NAME}. Make sure the theme exists and you have access."
+    if ! items=$(hs ls "$SOURCE_NAME" 2>/dev/null); then
+        print_error "Failed to list items from ${SOURCE_NAME}. Make sure the source folder exists and you have access."
         exit 1
     fi
     
@@ -103,7 +102,7 @@ fetch_all_items() {
     done <<< "$items"
     
     if [[ ${#items_array[@]} -eq 0 ]]; then
-        print_warning "No items found in ${THEME_NAME}"
+        print_warning "No items found in ${SOURCE_NAME}"
         return 0
     fi
     
@@ -152,7 +151,7 @@ main() {
     fi
     
     # Show what will happen
-    echo "This script will fetch all items from '${THEME_NAME}' to '${LOCAL_DESTINATION}'"
+    echo "This script will fetch all items from '${SOURCE_NAME}' to '${LOCAL_DESTINATION}'"
     if [[ -n "$OVERWRITE_FLAG" ]]; then
         echo "Overwrite mode is enabled (existing files will be replaced)"
     else
@@ -179,7 +178,7 @@ if [[ $# -lt 2 ]]; then
 fi
 
 # Get required arguments
-THEME_NAME="$1"
+SOURCE_NAME="$1"
 LOCAL_DESTINATION="$2"
 shift 2
 
