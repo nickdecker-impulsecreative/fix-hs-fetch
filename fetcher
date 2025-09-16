@@ -1,0 +1,207 @@
+#!/bin/bash
+
+# HubSpot Theme Fetcher Script
+# This script dynamically fetches all subfolders and files from any HubSpot theme
+# to work around the CLI bug with the "." character in destination paths
+#
+# Usage: fetcher <src> <dest> [options]
+# Examples:
+#   fetcher Omega-2.0 Omega-2.0 -overwrite
+#   fetcher themeversion1.1 newfolder -o
+#   fetcher foldercity88.7 foldercity
+
+set -e  # Exit on any error
+
+# Default configuration
+OVERWRITE_FLAG=""
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Function to print colored output
+print_status() {
+    echo -e "${BLUE}[INFO]${NC} $1"
+}
+
+print_success() {
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
+}
+
+print_warning() {
+    echo -e "${YELLOW}[WARNING]${NC} $1"
+}
+
+print_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+# Function to show usage
+show_usage() {
+    echo "Usage: $0 <src> <dest> [options]"
+    echo
+    echo "Arguments:"
+    echo "  src    Source theme name in HubSpot"
+    echo "  dest   Local destination directory"
+    echo
+    echo "Options:"
+    echo "  -o, -overwrite    Overwrite existing files"
+    echo "  -h, --help        Show this help message"
+    echo
+    echo "Examples:"
+    echo "  $0 Omega-2.0 Omega-2.0 -overwrite"
+    echo "  $0 themeversion1.1 newfolder -o"
+    echo "  $0 foldercity88.7 foldercity"
+    echo "  $0 MyTheme ./my-local-theme -overwrite"
+}
+
+# Function to check if hs command is available
+check_hs_command() {
+    if ! command -v hs &> /dev/null; then
+        print_error "HubSpot CLI (hs) is not installed or not in PATH"
+        exit 1
+    fi
+}
+
+# Function to fetch a single item (folder or file)
+fetch_item() {
+    local item="$1"
+    local remote_path="${THEME_NAME}/${item}"
+    local local_path="${LOCAL_DESTINATION}/${item}"
+    
+    print_status "Fetching: ${remote_path} -> ${local_path}"
+    
+    if hs fetch "$remote_path" "$local_path" $OVERWRITE_FLAG; then
+        print_success "Successfully fetched: ${item}"
+        return 0
+    else
+        print_error "Failed to fetch: ${item}"
+        return 1
+    fi
+}
+
+# Function to fetch all items from the theme
+fetch_all_items() {
+    print_status "Getting list of items from ${THEME_NAME}..."
+    
+    # Get the list of items from hs ls
+    local items
+    if ! items=$(hs ls "$THEME_NAME" 2>/dev/null); then
+        print_error "Failed to list items from ${THEME_NAME}. Make sure the theme exists and you have access."
+        exit 1
+    fi
+    
+    # Convert the output to an array, filtering out empty lines
+    local items_array=()
+    while IFS= read -r line; do
+        if [[ -n "$line" ]]; then
+            items_array+=("$line")
+        fi
+    done <<< "$items"
+    
+    if [[ ${#items_array[@]} -eq 0 ]]; then
+        print_warning "No items found in ${THEME_NAME}"
+        return 0
+    fi
+    
+    print_status "Found ${#items_array[@]} items to fetch:"
+    for item in "${items_array[@]}"; do
+        echo "  - $item"
+    done
+    echo
+    
+    # Fetch each item
+    local success_count=0
+    local failure_count=0
+    
+    for item in "${items_array[@]}"; do
+        if fetch_item "$item"; then
+            ((success_count++))
+        else
+            ((failure_count++))
+        fi
+        echo  # Add spacing between items
+    done
+    
+    # Summary
+    echo "=========================================="
+    print_success "Fetch completed!"
+    print_status "Successfully fetched: ${success_count} items"
+    if [[ $failure_count -gt 0 ]]; then
+        print_warning "Failed to fetch: ${failure_count} items"
+    fi
+    echo "=========================================="
+}
+
+# Main function
+main() {
+    echo "=========================================="
+    echo "HubSpot Theme Fetcher"
+    echo "=========================================="
+    echo
+    
+    # Check prerequisites
+    check_hs_command
+    
+    # Check if destination directory exists
+    if [[ ! -d "$LOCAL_DESTINATION" ]]; then
+        print_warning "Local destination directory '$LOCAL_DESTINATION' does not exist. It will be created."
+    fi
+    
+    # Show what will happen
+    echo "This script will fetch all items from '${THEME_NAME}' to '${LOCAL_DESTINATION}'"
+    if [[ -n "$OVERWRITE_FLAG" ]]; then
+        echo "Overwrite mode is enabled (existing files will be replaced)"
+    else
+        echo "Overwrite mode is disabled (existing files will be skipped)"
+    fi
+    echo
+    read -p "Do you want to continue? (y/N): " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        print_status "Operation cancelled by user"
+        exit 0
+    fi
+    
+    echo
+    fetch_all_items
+}
+
+# Parse command line arguments
+if [[ $# -lt 2 ]]; then
+    print_error "Missing required arguments"
+    echo
+    show_usage
+    exit 1
+fi
+
+# Get required arguments
+THEME_NAME="$1"
+LOCAL_DESTINATION="$2"
+shift 2
+
+# Parse optional arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -o|-overwrite)
+            OVERWRITE_FLAG="-o"
+            shift
+            ;;
+        -h|--help)
+            show_usage
+            exit 0
+            ;;
+        *)
+            print_error "Unknown option: $1"
+            echo
+            show_usage
+            exit 1
+            ;;
+    esac
+done
+
+# Run main function
+main
