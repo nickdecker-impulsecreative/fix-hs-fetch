@@ -118,6 +118,8 @@ npm install -g @hubspot/cli
 ## Example Output
 
 ```
+> ./fetcher Omega-2.0 Omega-2.0 -o
+
 ==========================================
 HubSpot Theme Fetcher
 ==========================================
